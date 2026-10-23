@@ -293,14 +293,14 @@
   </div>
 
   <header class="shell">
-    <div class="eyebrow">Read-only audit · July 9, 2026</div>
+    <div class="eyebrow">Read-only audit · Updated August 1, 2026</div>
     <h1>Fix the app.<br>Keep its soul.</h1>
     <p class="lede">A source-backed repair map for Epilogue. It covers build health, data safety, Book View behavior, security, performance, accessibility, and SDK 27 readiness. The background shaders, gradient system, glass language, type, spacing, and motion are protected invariants.</p>
     <div class="meta">
-      <span class="chip">Commit aab97d6</span>
+      <span class="chip">Commit 2db625b</span>
       <span class="chip">Xcode 27.0 beta</span>
       <span class="chip">iOS 26 deployment floor</span>
-      <span class="chip">51 vetted findings</span>
+      <span class="chip">65 vetted findings</span>
       <span class="chip">0 app source files changed</span>
     </div>
   </header>
@@ -314,16 +314,16 @@
         </div>
       </div>
       <div class="summary-grid">
-        <div class="stat"><strong>51</strong><span>vetted findings and migration watch items</span></div>
+        <div class="stat"><strong>65</strong><span>vetted findings and migration watch items</span></div>
         <div class="stat"><strong>9</strong><span>P0 blockers or data and security risks</span></div>
-        <div class="stat"><strong>7</strong><span>pixel-affecting items requiring design approval</span></div>
+        <div class="stat"><strong>8</strong><span>pixel-affecting items requiring design approval</span></div>
         <div class="stat"><strong>0</strong><span>shader or gradient changes authorized</span></div>
       </div>
     </section>
 
     <section id="evidence">
       <h2>Verification state</h2>
-      <p class="section-note">The audit used the live source tree plus a clean Xcode 27 build in a disposable copy. Nothing from the disposable build was copied back into the repository.</p>
+      <p class="section-note">The audit used the live source tree plus a source-aligned iOS 27 simulator build in a disposable copy. Nothing from the disposable build was copied back into the app source.</p>
       <div class="callout danger">
         <strong>The live checkout does not clean-build.</strong>
         <p>The first build stops because <code>Epilogue/Config.xcconfig</code> is referenced by the project but absent. A disposable copy supplied the checked-in template and reached the next hard error: <code>TrailMarkerViews.swift:167</code> uses <code>modelContext</code> without importing SwiftData.</p>
@@ -334,7 +334,26 @@
       </div>
       <div class="callout safe">
         <strong>Fresh simulator evidence is included below.</strong>
-        <p>The already installed Epilogue 1.9 build was launched directly without rebuilding. These images document the restored visual system on iOS 27.0. They are not screenshots from the reverted redesign.</p>
+        <p>The disposable Epilogue build was exercised on an iPhone 17 Pro simulator running iOS 27.0. Library, Book View, Add Book search, Notes, Sessions, Settings, input, and Ambient entry paths were checked without changing production source. These images document the restored visual system, not the reverted redesign.</p>
+      </div>
+    </section>
+
+    <section id="deep-pass">
+      <h2>August deep-pass delta</h2>
+      <p class="section-note">Fourteen additional findings survived source verification and runtime triage. The largest new cluster is lifecycle and performance work that can be fixed without changing a pixel.</p>
+      <div class="summary-grid">
+        <div class="stat"><strong>6</strong><span>new runtime and performance defects</span></div>
+        <div class="stat"><strong>6</strong><span>new state, persistence, security, and test defects</span></div>
+        <div class="stat"><strong>2</strong><span>new simulator-confirmed UI and accessibility defects</span></div>
+        <div class="stat"><strong>0</strong><span>production source files edited during this pass</span></div>
+      </div>
+      <div class="callout danger">
+        <strong>Several background costs persist after their UI disappears.</strong>
+        <p>Notification observers are leaked across repeated entries, a cognitive-particle timer can continue at 60 Hz after removal, and the release app starts a permanent display link for diagnostic FPS tracking. These are concrete energy and responsiveness defects, not a request to simplify motion or shader rendering.</p>
+      </div>
+      <div class="callout">
+        <strong>The visual stack is not the performance target.</strong>
+        <p>The safe wins are lifecycle cleanup, off-main image decode and disk work, stable archive identity, cached cover loading, bounded persistence, and debug-gating diagnostics. The Metal shaders, gradient inputs, palette extraction output, glass layers, and motion language remain protected.</p>
       </div>
     </section>
 
@@ -342,7 +361,7 @@
       <div class="section-head">
         <div>
           <h2>Current app screenshots</h2>
-          <p class="section-note">Captured July 9, 2026 from Epilogue 1.9 on an iPhone 17 Pro simulator running iOS 27.0 in portrait. The app was launched from its existing simulator installation because the checkout still has clean-build blockers.</p>
+          <p class="section-note">Captured July 9 and August 1, 2026 from Epilogue on an iPhone 17 Pro simulator running iOS 27.0 in portrait. The checkout still has clean-build blockers, so verification used disposable or already installed builds without copying changes into production source.</p>
         </div>
       </div>
       <div class="screenshot-grid">
@@ -362,10 +381,14 @@
           <img src="screenshots/end-session-sheet.png" alt="Holly Book View with the End Session sheet covering the lower half of the screen" width="402" height="874" loading="lazy">
           <figcaption><strong>End Session</strong><span>Confirmed layout bug: page inputs and Save Session continue below the visible half-height sheet.</span></figcaption>
         </figure>
+        <figure class="screenshot-card">
+          <img src="screenshots/book-view-bottom-overlay.png" alt="Dune Book View with Summary content beneath the quick-input pill and tab bar" width="402" height="874" loading="lazy">
+          <figcaption><strong>Bottom overlay collision</strong><span>Confirmed layout bug: Read more begins at the same vertical position as the tab bar and sits behind the quick-input pill.</span></figcaption>
+        </figure>
       </div>
       <div class="callout danger">
-        <strong>The End Session layout bug is reproduced, not inferred.</strong>
-        <p>The visible sheet ends after the duration area. The accessibility hierarchy places Current Page and Save Session below the visible sheet at approximately y 811, confirming that the composition exceeds the presented height.</p>
+        <strong>Both Book View layout bugs are reproduced, not inferred.</strong>
+        <p>The End Session hierarchy places Current Page and Save Session below the visible sheet at approximately y 811. In the current Book View viewport, the hierarchy places Read more at y 791.2 while the tab bar begins at y 791 and the quick-input control begins at y 742.</p>
       </div>
     </section>
 
@@ -462,6 +485,7 @@
               <li>Prevent writes when only an emergency in-memory container is available. Present a recovery state with retry and export.</li>
               <li>Use one canonical V10 schema and <code>EpilogueMigrationPlan</code>. Include the knowledge-graph models used at launch.</li>
               <li>Create historical persistent-store fixtures. Test every schema hop, relationship, identifier, rollback, and failure path.</li>
+              <li>Scope Ambient capture identity to a canonical book and session, remove double appends, and migrate invalid reading-status values.</li>
             </ol>
             <div class="gate"><strong>Gate:</strong> Failure injection never deletes the source store. No editable app opens on an ephemeral store. Historical fixtures migrate with unchanged record counts and relationships.</div>
           </div>
@@ -478,6 +502,7 @@
               <li>Centralize page parsing and validation. Write the same accepted page to every record and define unknown-page-count behavior.</li>
               <li>Cancel delayed completion work, preserve the stop timestamp, report save failures, restore or close unfinished sessions, and prevent duplicate archive records.</li>
               <li>Wire the re-entry Ambient action and Add Page Count action. Persist or remove completion fields that currently discard input.</li>
+              <li>Bind every coordinator-driven sheet to the existing app coordinator, never a freshly constructed instance.</li>
             </ol>
             <div class="gate"><strong>Gate:</strong> Unit and integration tests cover every item. Protected-file hashes remain identical. Same-state screenshots show no unintended pixel drift.</div>
           </div>
@@ -493,6 +518,7 @@
               <li>Replace extractable shared proxy authentication with server-validated short-lived authorization.</li>
               <li>Redact invitation tokens and deep-link query values. Enforce exact HTTPS host validation.</li>
               <li>Make Keychain writes and deletes return typed failures. Update UI state only after success.</li>
+              <li>Use Keychain as the single Perplexity credential source and remove the plaintext UserDefaults path after migration.</li>
               <li>Centralize notification permission and request it in context. Remove unused photo-library permission strings through Xcode if production code does not need them.</li>
             </ol>
             <div class="gate"><strong>Gate:</strong> Secret scan is clean, rotated values are invalid, URL validation tests pass, and permission prompts occur only from explicit user flows.</div>
@@ -507,7 +533,9 @@
             <ol>
               <li>Keep slider updates in memory while dragging and persist once on completion. Do not fetch and rewrite the full library on every movement.</li>
               <li>Move launch maintenance off the interactive main-actor window and remove the memory-resurfacing N+1 queries.</li>
-              <li>Remove or debug-gate unbounded cover-image retention. Preserve exact image and palette results.</li>
+              <li>Move cover disk I/O, decode, resize, and JPEG work off the main actor. Remove or debug-gate unbounded cover-image retention while preserving exact image and palette results.</li>
+              <li>Invalidate leaked notification observers and the hidden 60 Hz particle timer. Debug-gate the permanent FPS display link.</li>
+              <li>Give Sessions Archive stable IDs and precomputed groups, then route archive and chat cover work through the existing caches.</li>
               <li>Resolve actor-isolation warnings in isolated service batches with targeted tests. Keep Swift 5 mode until the warning gate is clean.</li>
               <li>Fix only compiler-confirmed ContentBuilder ambiguities in place. Never reorder background, overlay, mask, clip, or glass modifiers.</li>
             </ol>
@@ -524,6 +552,7 @@
               <li>End Session compact width and input validation.</li>
               <li>Active-session HUD compact behavior, live timer, and 44 by 44 point hit regions.</li>
               <li>Progress-artwork containment at 320 points and iPad split widths without touching its gradient or motion.</li>
+              <li>Book View bottom-content clearance for the persistent input pill and tab bar, using one shared safe-area contract.</li>
               <li>Dynamic Type and collapsed-summary behavior while preserving the typographic character.</li>
               <li>Known background-before-glass violations, only after confirming the active path and an equivalent hit-testing solution.</li>
               <li>Toolbar constrained-width behavior using availability-gated SDK 27 APIs only if the current composition demonstrably fails.</li>
@@ -545,7 +574,8 @@
           <tr><td>Persistence</td><td>Historical store migration, failure injection, relaunch, CloudKit recovery, no source-store deletion.</td><td>Block release.</td></tr>
           <tr><td>Visual</td><td>Fixed simulator, seeded data, same state, light/dark where relevant, 320pt width, iPad split width, AX text sizes.</td><td>Rollback or ask for design direction.</td></tr>
           <tr><td>Protected stack</td><td>File hashes and diff confirm no changes to Metal, background, color extraction, palette, design tokens, or animation timing.</td><td>Reject the change as out of scope.</td></tr>
-          <tr><td>Runtime</td><td>Start, pause, cancel, resume, save, fail-save, completion rollback, re-entry, replacement, and relaunch flows.</td><td>Behavior remains unsafe.</td></tr>
+          <tr><td>Runtime</td><td>Start, pause, cancel, resume, save, fail-save, completion rollback, re-entry, replacement, relaunch, and repeated Ambient entry and exit.</td><td>Behavior remains unsafe.</td></tr>
+          <tr><td>Performance</td><td>Time Profiler, Hangs, SwiftUI, Allocations, and Energy Log traces on a release-style build with seeded small and large libraries.</td><td>Static fixes are not proven to improve frame time, hangs, memory, or energy.</td></tr>
         </tbody>
       </table>
     </section>
@@ -585,7 +615,7 @@
   </main>
 
   <footer>
-    <div class="shell">Generated locally from commit <code>aab97d6</code>. The new workspace artifacts are this report and four simulator screenshots. The pre-existing <code>BookConnectionsCard.swift</code> change remains untouched.</div>
+    <div class="shell">Updated locally from commit <code>2db625b</code>. This audit changed only the report and added one simulator screenshot. App source, Metal shaders, gradient infrastructure, color extraction, glass composition, design tokens, and motion remain untouched.</div>
   </footer>
 
   <script>
@@ -600,6 +630,9 @@
       { id: 'DATA-02', priority: 'P0', tone: 'p0', category: 'data', title: 'Emergency in-memory fallback still opens an editable app', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>EpilogueApp.swift:409-447</code>', impact: 'Books, notes, and sessions can appear saved and then disappear at process exit.', fix: 'Show a blocking read-only recovery surface instead of the normal app when persistence is ephemeral.' },
       { id: 'DATA-03', priority: 'P0', tone: 'p0', category: 'data', title: 'Production bypasses the canonical schema and migration plan', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>EpilogueApp.swift:178-205</code>, <code>SchemaVersioning.swift:211-266</code>', impact: 'Knowledge-graph models used at launch are absent from the production model list, and ten declared migrations are skipped.', fix: 'Create one production container factory using the complete V10 schema and EpilogueMigrationPlan, verified against historical stores.' },
       { id: 'DATA-04', priority: 'P1', tone: 'p1', category: 'data', title: 'Google Books metadata fields never decode', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>GoogleBooksAPI.swift:141-144</code>', impact: 'Publisher, language, average rating, and rating count remain nil even when the API returns them.', fix: 'Remove immutable default initializers or supply an explicit decoder, then add a representative fixture test.' },
+      { id: 'DATA-05', priority: 'P1', tone: 'p1', category: 'data book', title: 'Ambient capture deduplication crosses books and sessions', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>AmbientModeView+Persistence.swift:80-119,255-269,355-396</code>', impact: 'Matching quote, note, or question text can suppress a new capture or reassign an old capture from another book or session.', fix: 'Scope identity and deduplication to the canonical book and session, migrate legacy collisions explicitly, and test equal text across different books.' },
+      { id: 'DATA-06', priority: 'P1', tone: 'p1', category: 'data book', title: 'Ambient typed captures are appended to the session twice', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>AmbientModeView+Persistence.swift:222-228,296-300</code>, <code>AmbientModeView.swift:2365-2391</code>', impact: 'One typed quote or note can produce duplicate session captures, inflated counts, and unnecessary writes.', fix: 'Give one layer sole ownership of the session append and add an assertion that one user submission produces one related record.' },
+      { id: 'NAV-01', priority: 'P1', tone: 'p1', category: 'data', title: 'Coordinator-driven sheets bind to throwaway coordinators', effort: 'S', risk: 'Medium', confidence: 'High', evidence: '<code>ContentView.swift:13,51-53</code>, <code>ContentViewExtensions.swift:147-197</code>', impact: 'Privacy, search, batch search, and scanner presentation getters and dismissals read newly constructed state instead of the live app coordinator.', fix: 'Pass the existing AppStateCoordinator into the modifier and bind every presentation and dismissal to that one instance.' },
       { id: 'BOOK-01', priority: 'P1', tone: 'p1', category: 'book', title: 'Book Detail renders mutable state from an immutable snapshot', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:71-79,223-227,748-790</code>, <code>LibraryView.swift:2397-2401,2465-2479</code>', impact: 'Status, progress, stats, and later session starts can remain stale until the view is recreated.', fix: 'Resolve one observable canonical book and derive data from it while preserving the exact view hierarchy and modifiers.' },
       { id: 'BOOK-02', priority: 'P1', tone: 'p1', category: 'book', title: 'Completion fires after progress is rolled back', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>AmbientReadingProgressView.swift:98-104,501-530</code>', impact: 'A reader can drag to 100 percent, move back, and still get marked read 2.5 seconds later.', fix: 'Store a cancellable task, cancel below 100 percent or on disappear, and revalidate state before mutation. Keep the celebration shader and timing.' },
       { id: 'BOOK-03', priority: 'P1', tone: 'p1', category: 'book', title: 'Re-entry Start Ambient silently does nothing', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:272-281,375-383,924-927</code>', impact: 'The card dismisses, but the upgrade function returns when no quick session exists.', fix: 'Use a direct book-specific Ambient launch path or create the required session explicitly.' },
@@ -616,30 +649,41 @@
       { id: 'BOOK-14', priority: 'P1', tone: 'p1', category: 'book data', title: 'Legacy notes and quotes collide on title alone', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookDetailView.swift:387-405</code>', impact: 'Same-title books can display each other’s legacy notes and quotes.', fix: 'Migrate to canonical local IDs using title plus author with explicit ambiguity handling.' },
       { id: 'BOOK-15', priority: 'P1', tone: 'p1', category: 'book data', title: 'Ambient sessions construct a new BookModel instead of linking the existing one', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>AmbientModeView+Persistence.swift:750-765</code>', impact: 'Session start can duplicate a book or attach a relationship to an unmanaged model, fragmenting history and re-entry data.', fix: 'Fetch the canonical BookModel by local ID, with provider ID only as a migration fallback.' },
       { id: 'BOOK-16', priority: 'P1', tone: 'p1', category: 'book', title: 'The active-session duration has no live clock', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookDetailView.swift:541-547</code>, <code>ReadingSession.swift:53-70</code>', impact: 'The displayed duration depends on Date but the active HUD has no TimelineView or timer-driven state, so it updates only incidentally.', fix: 'Drive only the duration label from a lightweight timeline. Keep the HUD geometry, typography, glass, and transitions identical.' },
+      { id: 'BOOK-17', priority: 'P1', tone: 'p1', category: 'book data', title: 'Ambient recommendations persist an invalid reading status', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>AmbientModeView+Helpers.swift:641-662</code>, <code>BookModel.swift:54,210-213</code>, <code>ReadingPlansHubView.swift:536-549</code>', impact: 'The stored value want_to_read does not match the canonical Want to Read value, so the new book can disappear from status-filtered flows.', fix: 'Persist ReadingStatus.wantToRead.rawValue through the shared status type and migrate the underscored legacy value.' },
       { id: 'PERF-01', priority: 'P1', tone: 'p1', category: 'performance book', title: 'Dragging progress persists the whole library on every movement', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>AmbientReadingProgressView.swift:353-389</code>, <code>LibraryView.swift:2005-2062,2465-2480</code>', impact: 'Each drag event fetches all BookModels, syncs the full array, saves SwiftData, and posts a notification, causing jank and write amplification.', fix: 'Update in-memory progress during drag and persist once on end, with a final validated value.' },
       { id: 'PERF-02', priority: 'P1', tone: 'p1', category: 'performance', title: 'Heavy launch maintenance runs in the interactive main-actor window', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>EpilogueApp.swift:37-74</code>, <code>BookDNAService.swift:24</code>, <code>MemoryResurfacingService.swift:35</code>', impact: 'Large libraries can hitch about one second after launch while the reader begins interacting.', fix: 'Move versioned, delta-based maintenance to dedicated contexts after first interaction or background processing.' },
       { id: 'PERF-03', priority: 'P1', tone: 'p1', category: 'performance', title: 'Full-resolution covers remain in an unbounded debug dictionary', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>SharedBookCoverView.swift:4,249-250</code>', impact: 'Opening books can retain every full image in addition to the bounded production caches.', fix: 'Remove the unused store or compile it only in debug with a strict limit. Verify image and palette output are identical.' },
       { id: 'PERF-04', priority: 'P1', tone: 'p1', category: 'performance book', title: 'Book Connections scans global themes and can hide valid connections', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>BookConnectionsCard.swift:25,117</code>, <code>KnowledgeGraphService.swift:385</code>', impact: 'A book with no globally top-20 theme can show no connections while each load scans and sorts every theme.', fix: 'Query themes scoped to the current book and rank there, preserving the card’s exact hierarchy and visual treatment.' },
+      { id: 'PERF-05', priority: 'P1', tone: 'p1', category: 'performance', title: 'Cover disk I/O and image processing inherit the main actor', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>SharedBookCoverManager.swift:6-7,242-244,398-428,470-522</code>', impact: 'Cold cover loads synchronously read, decode, resize, JPEG-encode, and update cache metadata on the interactive actor, creating scroll and navigation hitch risk.', fix: 'Move file I/O, decode, resize, and cost calculation off the main actor, then publish only the finished UIImage. Preserve exact dimensions, interpolation, compression, and pixels.' },
+      { id: 'PERF-06', priority: 'P1', tone: 'p1', category: 'performance', title: 'Cognitive particles can keep running at 60 Hz after removal', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>CognitivePatternVisualizer.swift:21-28,207-215,240-263</code>, <code>AmbientChatOverlay.swift:675-679</code>', impact: 'The timer strongly owns the particle system, no disappear path stops it, and repeated chat sessions can accumulate per-frame mutation after the effect is gone.', fix: 'Stop and invalidate on disappear and deinit, use weak ownership, and add a lifecycle test. Keep the particle count, geometry, color, and motion unchanged while visible.' },
+      { id: 'PERF-07', priority: 'P1', tone: 'p1', category: 'performance', title: 'Release diagnostics run a permanent display link', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>PerformanceMonitor.swift:28-30,91-114</code>, <code>LibraryView.swift:27</code>, <code>SwiftDataNotesView.swift:11</code>', impact: 'Instantiating the shared monitor schedules work every display frame for the life of the process and mutates observed FPS state every ten frames.', fix: 'Compile the display link only for diagnostics or start it on explicit demand with a symmetric stop path.' },
+      { id: 'LIFE-01', priority: 'P1', tone: 'p1', category: 'performance book', title: 'Block-based notification observers leak across repeated entries', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>AmbientModeView.swift:832-853,1771-1793</code>, <code>ChatSharedTypes.swift:232-262</code>, <code>LiquidCommandPalette.swift:217-253</code>, <code>LibraryView.swift:1842-1853</code>', impact: 'Opaque observer tokens are discarded, and removeObserver(self) cannot remove them, so callbacks and main-thread work accumulate over time.', fix: 'Store every returned token, remove it on the matching lifecycle boundary, and avoid strong captures where the observer can outlive its owner.' },
+      { id: 'PERF-09', priority: 'P1', tone: 'p1', category: 'performance', title: 'Archive and chat bypass shared cover and palette caches', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>SessionsArchiveView.swift:313-347</code>, <code>AmbientChatOverlay.swift:1464-1476</code>, <code>DynamicIslandToast.swift:458-467</code>', impact: 'Repeated visits can redownload identical covers, decode them again, and rerun palette extraction that other app paths already cache.', fix: 'Route these consumers through the shared cover and palette services while preserving the current extractor, selected colors, and rendered result.' },
+      { id: 'PERF-10', priority: 'P1', tone: 'p1', category: 'performance', title: 'Sessions Archive rebuilds content with unstable identity', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>SessionsArchiveView.swift:36-51,102,153-191,223,262-283,352-361</code>', impact: 'Every body pass refilters and concatenates capture text, regroups and sorts sessions, and creates fresh UUIDs that invalidate SwiftUI identity and palette cache lookups.', fix: 'Precompute immutable view data when inputs change and derive stable IDs from canonical session, book, and day keys.' },
       { id: 'SEC-01', priority: 'P0', tone: 'p0', category: 'security', title: 'Committed credentials exist in source and tracked archives', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>.archive/session-notes/perplexity.md:1</code>, <code>API_KEY_SETUP.md:15,26</code>, <code>GoogleBooksAPI.swift:10</code>', impact: 'Repository readers can recover provider credentials. Deleting the current line does not invalidate history.', fix: 'Rotate first, purge current files and history, and add secret scanning. Never include credential values in reports or logs.' },
       { id: 'SEC-02', priority: 'P0', tone: 'p0', category: 'security', title: 'Proxy authentication is extractable from every shipped binary', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>SecureAPIManager.swift:17-19,79</code>, <code>ClaudeService.swift:369-374</code>, <code>OptimizedPerplexityService.swift:784-789</code>', impact: 'A shared client secret can be recovered and replayed against the proxy.', fix: 'Rotate it and move to server-validated receipts, entitlements, or short-lived tokens. Treat clients as public.' },
       { id: 'SEC-03', priority: 'P1', tone: 'p1', category: 'security', title: 'Invitation bearer tokens and deep-link queries are logged', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>DeepLinkHandler.swift:38</code>, <code>SocialCompanionService.swift:78,163</code>', impact: 'Console and diagnostic logs can expose live invitation credentials.', fix: 'Log route names and redacted request identifiers only.' },
       { id: 'SEC-04', priority: 'P1', tone: 'p1', category: 'security', title: 'Book-cover validation accepts HTTP and substring host matches', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>URLValidator.swift:7,76-145</code>', impact: 'A lookalike host containing a trusted hostname can pass validation, and cover downloads need not use HTTPS.', fix: 'Require HTTPS and allow only exact hosts or dot-delimited subdomains. Test redirects and suffix tricks.' },
       { id: 'SEC-05', priority: 'P1', tone: 'p1', category: 'security', title: 'Keychain write and delete failures are swallowed', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>KeychainManager.swift:195-204</code>', impact: 'The UI can claim a credential changed while the old value remains active.', fix: 'Return a typed result or throw, then update service state only after success.' },
+      { id: 'SEC-06', priority: 'P1', tone: 'p1', category: 'security', title: 'Perplexity configuration is split between Keychain and plaintext defaults', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>APIConfigurationView.swift:141-169</code>, <code>PerplexitySearchService.swift:108-125</code>, <code>EnhancedTrendingBooksService.swift:208-224</code>', impact: 'The Settings key can be invisible to search and trending, while an alternate code path stores the credential in UserDefaults.', fix: 'Make Keychain the only credential source, inject one configuration provider into both services, migrate then delete the defaults value, and surface typed configuration errors.' },
       { id: 'PRIV-01', priority: 'P2', tone: 'p2', category: 'security', title: 'Notification permission is requested at app appearance from multiple owners', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>EpilogueApp.swift:27-30,125-145</code>, <code>OnboardingCoordinator.swift:61-76</code>', impact: 'First launch can show an unexplained prompt before a reader chooses a notification feature.', fix: 'Centralize authorization and request it from onboarding context or a feature toggle.' },
       { id: 'PRIV-02', priority: 'P2', tone: 'p2', category: 'security tooling', title: 'Production declares photo access for disabled diagnostic image saving', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>project.pbxproj:513-514,561-562</code>, <code>ImprovedColorExtraction.swift:399-403</code>', impact: 'The privacy surface and App Store disclosure imply a production capability that is currently commented out.', fix: 'Confirm no shipping path needs Photos, then remove the usage descriptions through Xcode.' },
       { id: 'LAYOUT-01', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'End Session has an unsatisfiable 320-point composition', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:3236-3316</code>', impact: 'Two fixed fields, gaps, icon, inner padding, and outer padding exceed compact available width.', fix: 'Change only the row’s adaptive behavior after baseline capture. Preserve controls, type, glass, spacing language, background, and motion.' },
       { id: 'LAYOUT-02', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Active-session HUD cannot adapt and controls miss the default 44-point target', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:541-627</code>', impact: 'Three metrics plus three controls share one row, and the icon controls have no explicit 44 by 44 point regions.', fix: 'Design a compact behavior with Kris. Do not touch the Ambient orb shader, glass, type, spacing tokens, or transition timing.' },
       { id: 'LAYOUT-03', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Progress artwork is wider than Book View at 320 points', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>DesignSystem.swift:45-59</code>, <code>BookDetailView.swift:691-695</code>, <code>AmbientReadingProgressView.swift:149-168</code>', impact: 'A 280-point glow is proposed inside 272 points of content width, creating pressure or clipping.', fix: 'Contain the existing artwork without changing gradient stops, colors, blur, opacity, shader, or animation.' },
       { id: 'A11Y-01', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Book Detail’s fixed type and summary crop do not scale reliably', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift:1036-1094,1236-1288</code> plus repeated fixed-size fonts', impact: 'Accessibility text can clip, lose hierarchy, or be cut by the fixed 100-point summary mask.', fix: 'Preserve the typeface and hierarchy while adding controlled scaling and adaptive crop behavior, reviewed at every AX size.' },
+      { id: 'A11Y-02', priority: 'P1', tone: 'p1', category: 'visual book', title: 'Search-result covers expose enormous concatenated VoiceOver labels', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>BookSearchSheet.swift:1123-1185</code>, <code>SharedBookCoverView.swift:338-385</code>; reproduced in the iOS 27 accessibility hierarchy', impact: 'A decorative cover image can announce a repeated concatenation of many result titles and authors, making the search list effectively unusable with VoiceOver.', fix: 'Hide decorative cover images from accessibility and give each result row one concise book label plus a clear Add action. This does not alter pixels.' },
       { id: 'GLASS-01', priority: 'REVIEW', tone: 'review', category: 'visual', title: 'Active surfaces contain background-before-glass chains', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>BookCompletionSheet.swift:317-320</code>, <code>CaptureReviewQueue.swift:98-102</code>, <code>AmbientSessionSummaryView.swift:698-702,1504-1508</code>', impact: 'Clear or nearly clear backgrounds before glass can break inherited Liquid Glass behavior, but some may be serving hit testing.', fix: 'Confirm each active path and replace the hit-testing mechanism without changing pixels. One surface at a time, with screenshots.' },
       { id: 'TOOLBAR-01', priority: 'REVIEW', tone: 'review', category: 'visual build', title: 'Book View has no constrained-width toolbar policy', effort: 'M', risk: 'High', confidence: 'Medium', evidence: '<code>BookDetailView.swift:748-790</code>', impact: 'A variable-width status pill and export control rely on older placements and may compress or overflow.', fix: 'Only if runtime evidence proves a failure, availability-gate SDK 27 visibility priority or pinned placement with an iOS 26 fallback.' },
       { id: 'LAYOUT-04', priority: 'REVIEW', tone: 'review', category: 'visual build', title: 'Global screen metrics are wrong for iPad multitasking and scenes', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>DynamicIslandToast.swift:23</code>, <code>RichTextEditor.swift:67</code>, <code>AmbientOrbButton.swift:27</code>', impact: 'UIScreen.main can provide the wrong width or scale for resized scenes and is deprecated in iOS 26.', fix: 'Migrate ordinary layout to container geometry first. Treat shader LOD and orb scale as separately approved visual work.' },
+      { id: 'LAYOUT-05', priority: 'REVIEW', tone: 'review', category: 'visual book', title: 'Persistent bottom controls cover Book View content', effort: 'M', risk: 'High', confidence: 'High', evidence: '<code>ContentView.swift:145-178</code>, <code>BookDetailView.swift:701-706</code>; reproduced at 402 by 874 points with Read more at y 791.2 and the tab bar starting at y 791', impact: 'The Summary card and Read more control render beneath the input pill and tab bar in the initial viewport, obscuring content and interaction.', fix: 'Account for the real overlay height using a shared safe-area contract or inset. Preserve the exact input pill, tab bar, card, gradient, glass, type, spacing language, and motion, then review same-device screenshots.' },
       { id: 'REL-01', priority: 'P1', tone: 'p1', category: 'tooling build', title: 'App and widget versions do not match', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>project.pbxproj:440-481,502-576</code>', impact: 'The widget reports version 1.0 build 2 while the app reports 1.9 build 1, creating release-validation risk.', fix: 'Align containing app and extension version/build values through Xcode.' },
       { id: 'DEP-01', priority: 'P1', tone: 'p1', category: 'tooling build', title: 'WhisperKit tracks main and the app links its CLI product', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>project.pbxproj:237-240,858-879</code>, <code>Package.resolved:50</code>', impact: 'Resolution can change the voice stack without intent, and the CLI expands the app build graph.', fix: 'Pin a verified release or exact revision and remove only the CLI product through Xcode, then test offline transcription.' },
       { id: 'DX-01', priority: 'P1', tone: 'p1', category: 'tooling', title: 'TestFlight preflight can report readiness after build failure', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>testflight_preflight.sh:14,44-47,96</code>', impact: 'The script uses the wrong project path, does not fail closed, and can print a successful readiness message anyway.', fix: 'Use strict shell mode, resolve paths from the script, run build and tests explicitly, and exit nonzero on every required failure.' },
       { id: 'DX-02', priority: 'P2', tone: 'p2', category: 'tooling', title: 'Legacy source trees outside the target look active', effort: 'M', risk: 'Medium', confidence: 'High', evidence: '<code>Epilogue/App</code>, top-level <code>Epilogue/Services</code> and <code>Epilogue/Views</code>, active target root at <code>Epilogue/Epilogue</code>', impact: 'Humans and agents can inspect or edit plausible Swift files that are not compiled, producing false fixes and contradictory audits.', fix: 'Inventory target membership and archive only files proven dead. Never move or rewrite active shader, gradient, or design-system files.' },
       { id: 'TEST-02', priority: 'P0', tone: 'p0', category: 'tooling data', title: 'Migration tests do not migrate historical stores', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>CloudKitFallbackTests.swift:155,223,243</code>, <code>test_migration.sh:36</code>', impact: 'The most dangerous path appears covered while tests use unrelated in-memory containers or uninstall before creating old data.', fix: 'Add versioned persistent fixtures and run them through the production container factory with failure injection.' },
       { id: 'TEST-03', priority: 'P1', tone: 'p1', category: 'tooling visual', title: 'Protected visuals have no regression gate', effort: 'M', risk: 'Low', confidence: 'High', evidence: '<code>EpilogueUITests.swift:26</code>, <code>EpilogueUITestsLaunchTests.swift:28</code>', impact: 'Book View, gradients, Metal backgrounds, glass, type, spacing, and motion can regress without automated signal.', fix: 'Add deterministic seeded screenshot baselines and require zero unintended pixel drift for UI-affecting fixes.' },
+      { id: 'TEST-04', priority: 'P1', tone: 'p1', category: 'tooling data', title: 'Goodreads tests exercise copied parsers instead of production code', effort: 'S', risk: 'Low', confidence: 'High', evidence: '<code>GoodreadsImportTests.swift:301-407</code>, <code>GoodreadsCleanImporter.swift:277-329</code>', impact: 'The test implementation can pass while the separate private production parser, cleaner, status mapper, or factory is broken.', fix: 'Expose production parsing through an internal testable seam and delete the duplicated test-only implementation.' },
       { id: 'ARCH-01', priority: 'P2', tone: 'p2', category: 'tooling performance', title: 'Large view files make small fixes unusually dangerous', effort: 'L', risk: 'High', confidence: 'High', evidence: '<code>BookDetailView.swift</code> 3,517 lines, <code>AmbientModeView.swift</code> 2,543 lines, <code>TrueAmbientProcessor.swift</code> 3,374 lines', impact: 'Data, persistence, state, and visual composition are interleaved, widening the blast radius of every edit.', fix: 'Do not decompose view bodies now. Extract pure validation, query, and persistence seams behind characterization tests first.' }
     ];
 
