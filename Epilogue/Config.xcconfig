@@ -1,0 +1,11 @@
+// Config.xcconfig
+// Nonsecret build defaults, tracked so a fresh checkout builds.
+// API keys never go here. The app keeps them in the Keychain via Settings.
+// For machine-specific overrides, create Config.local.xcconfig next to this
+// file. It is gitignored and optional.
+
+PERPLEXITY_API_KEY =
+DEBUG_MODE = YES
+ENABLE_LOGGING = YES
+
+#include? "Config.local.xcconfig"

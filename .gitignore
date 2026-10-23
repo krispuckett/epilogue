@@ -116,3 +116,4 @@ iOSInjectionProject/
 # API Keys and Configuration
 Config.xcconfig
 *.xcconfig
+!/Epilogue/Config.xcconfig
