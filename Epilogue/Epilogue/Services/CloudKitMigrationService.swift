@@ -251,6 +251,7 @@ final class CloudKitMigrationService: ObservableObject {
 struct CloudKitMigrationView: View {
     @StateObject private var migrationService = CloudKitMigrationService.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         ZStack {
@@ -344,9 +345,10 @@ struct CloudKitMigrationView: View {
                             
                             Button("Retry") {
                                 Task {
-                                    if let container = try? ModelContainer(for: BookModel.self) {
-                                        await migrationService.checkAndPerformMigration(container: container)
-                                    }
+                                    // Retry against the app's live container. A fresh
+                                    // ModelContainer(for: BookModel.self) would open the same
+                                    // store file with a one-model schema.
+                                    await migrationService.checkAndPerformMigration(container: modelContext.container)
                                 }
                             }
                             .buttonStyle(.borderedProminent)
