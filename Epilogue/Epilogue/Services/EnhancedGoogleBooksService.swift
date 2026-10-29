@@ -386,13 +386,13 @@ class EnhancedGoogleBooksService: GoogleBooksService {
 
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(maxResults)),
             URLQueryItem(name: "startIndex", value: String(startIndex)),
             URLQueryItem(name: "orderBy", value: orderBy),
             URLQueryItem(name: "langRestrict", value: "en"),
             URLQueryItem(name: "projection", value: "full")
         ]
+        components.queryItems?.append(contentsOf: googleBooksKeyQueryItems)
 
         guard let url = components.url else { return nil }
 

@@ -8,4 +8,7 @@ PERPLEXITY_API_KEY =
 DEBUG_MODE = YES
 ENABLE_LOGGING = YES
 
+// Google Books key. Set the real value in Config.local.xcconfig.
+GOOGLE_BOOKS_API_KEY =
+
 #include? "Config.local.xcconfig"

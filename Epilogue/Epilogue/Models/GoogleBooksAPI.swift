@@ -6,8 +6,19 @@ import UniformTypeIdentifiers
 // Toggle verbose console logging for Google Books plumbing
 private let GOOGLE_API_VERBOSE = false
 
-// Google Books API key — restrict to Books API in Google Cloud Console
-let GoogleBooksAPIKey = "AIzaSyASq6uyHXIQ9OIGTed8bOuKvtZR2neHnFQ"
+// Google Books API key from Info.plist, filled from the GOOGLE_BOOKS_API_KEY build
+// setting. The value lives in the untracked Config.local.xcconfig, never in source.
+// With no key, requests go out keyless, which Google allows at a lower quota.
+let GoogleBooksAPIKey: String = {
+    let value = (Bundle.main.object(forInfoDictionaryKey: "GoogleBooksAPIKey") as? String)?
+        .trimmingCharacters(in: .whitespaces) ?? ""
+    return value.hasPrefix("$(") ? "" : value
+}()
+
+/// The key query item, or nothing when no key is configured.
+var googleBooksKeyQueryItems: [URLQueryItem] {
+    GoogleBooksAPIKey.isEmpty ? [] : [URLQueryItem(name: "key", value: GoogleBooksAPIKey)]
+}
 
 // MARK: - Google Books API Models
 struct GoogleBooksResponse: Codable {
@@ -490,10 +501,10 @@ class GoogleBooksService {
         guard var components = URLComponents(string: baseURL) else { return nil }
         components.queryItems = [
             URLQueryItem(name: "q", value: "isbn:\(isbn)"),
-            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: "1"),
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
+        components.queryItems?.append(contentsOf: googleBooksKeyQueryItems)
         
         guard let url = components.url else { return nil }
         #if DEBUG
@@ -665,7 +676,6 @@ class GoogleBooksService {
         }
         components.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
-            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
             URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),
@@ -673,6 +683,7 @@ class GoogleBooksService {
             URLQueryItem(name: "langRestrict", value: "en"),  // English books
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
+        components.queryItems?.append(contentsOf: googleBooksKeyQueryItems)
         
         guard let url = components.url else {
             if GOOGLE_API_VERBOSE { print("GoogleBooksAPI: Invalid URL") }
@@ -1043,13 +1054,13 @@ class GoogleBooksService {
 
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "key", value: GoogleBooksAPIKey),
             URLQueryItem(name: "maxResults", value: String(resultsPerPage)),
             URLQueryItem(name: "startIndex", value: String(startIndex)), // Pagination support
             URLQueryItem(name: "orderBy", value: "relevance"),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "projection", value: "full")  // Request full volume data including all imageLinks
         ]
+        components.queryItems?.append(contentsOf: googleBooksKeyQueryItems)
         
         guard let url = components.url else {
             throw APIError.invalidURL
